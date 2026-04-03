@@ -74,6 +74,14 @@ export default function DashboardClient({ initialProfile }: Props) {
               <ExternalLink size={12} />
               내 명함 보기
             </a>
+            <a
+              href="https://forms.gle/1aqHTAtAfbWTZoPLA"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
+            >
+              피드백
+            </a>
             <button
               onClick={handleLogout}
               className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
