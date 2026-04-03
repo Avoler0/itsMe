@@ -23,6 +23,50 @@ import { signOut } from '@/lib/repositories/auth'
 import LinkIcon from '@/components/LinkIcon'
 import type { Link, Profile, ProfileWithLinks } from '@/types'
 
+// ─── 상수 ──────────────────────────────────────────────────────
+const VALID_IMAGE_MIMES: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png':  'png',
+  'image/webp': 'webp',
+  'image/gif':  'gif',
+}
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+
+const VALID_LINK_PROTOCOLS = ['http:', 'https:', 'mailto:', 'tel:']
+
+const MAX_LENGTHS = {
+  display_name:   100,
+  username:        30,
+  bio:            300,
+  phone:           20,
+  email:          255,
+  bank_name:       50,
+  account_holder:  50,
+  account_number:  50,
+  kakao_pay_url:  500,
+  toss_url:       500,
+  link_title:     100,
+  link_url:      2048,
+}
+
+function validateImageFile(file: File): string | null {
+  if (!VALID_IMAGE_MIMES[file.type]) return '지원하지 않는 파일 형식이에요 (jpg, png, webp, gif만 가능)'
+  if (file.size > MAX_FILE_SIZE) return '파일 크기는 5MB 이하여야 해요'
+  return null
+}
+
+function isValidLinkUrl(url: string): boolean {
+  try {
+    return VALID_LINK_PROTOCOLS.includes(new URL(url).protocol)
+  } catch {
+    return false
+  }
+}
+
+function isValidHexColor(color: string): boolean {
+  return /^#[0-9A-Fa-f]{6}$/.test(color)
+}
+
 // ─── Props ─────────────────────────────────────────────────────
 interface Props {
   initialProfile: ProfileWithLinks
@@ -38,6 +82,8 @@ export default function DashboardClient({ initialProfile }: Props) {
   const [saved, setSaved] = useState(false)
   const [newLink, setNewLink] = useState({ title: '', url: '', iconFile: null as File | null, iconPreview: '' })
   const [addingLink, setAddingLink] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [linkError, setLinkError] = useState<string | null>(null)
 
   // 드래그 상태 (ref: 드롭 로직용, state: 시각 피드백용)
   const dragIndexRef = useRef<number | null>(null)
@@ -93,10 +139,26 @@ export default function DashboardClient({ initialProfile }: Props) {
   async function handleAddLink() {
     if (!newLink.title || !newLink.url) return
 
+    if (!isValidLinkUrl(newLink.url)) {
+      setLinkError('http:// 또는 https://로 시작하는 URL을 입력해주세요')
+      return
+    }
+    if (newLink.title.length > MAX_LENGTHS.link_title) {
+      setLinkError(`제목은 ${MAX_LENGTHS.link_title}자 이하여야 해요`)
+      return
+    }
+    if (newLink.url.length > MAX_LENGTHS.link_url) {
+      setLinkError('URL이 너무 길어요')
+      return
+    }
+    setLinkError(null)
+
     let icon = detectIcon(newLink.url)
 
     if (newLink.iconFile) {
-      const ext = newLink.iconFile.name.split('.').pop()
+      const err = validateImageFile(newLink.iconFile)
+      if (err) { setUploadError(err); return }
+      const ext = VALID_IMAGE_MIMES[newLink.iconFile.type]
       const path = `${profile.user_id}/${Date.now()}.${ext}`
       const { data, error } = await supabase.storage
         .from('link-icons')
@@ -171,6 +233,8 @@ export default function DashboardClient({ initialProfile }: Props) {
 
   // ── 색상 즉시 저장 헬퍼 ──────────────────────────────────────
   async function saveColor(field: 'theme' | 'text_color' | 'button_color', value: string) {
+    // 커스텀 hex인 경우 형식 검증
+    if (value.startsWith('#') && !isValidHexColor(value)) return
     setProfile((p) => ({ ...p, [field]: value }))
     await updateProfile(supabase, profile.user_id, { [field]: value })
   }
@@ -239,7 +303,10 @@ export default function DashboardClient({ initialProfile }: Props) {
                 onChange={async (e) => {
                   const file = e.target.files?.[0]
                   if (!file) return
-                  const ext = file.name.split('.').pop()
+                  const err = validateImageFile(file)
+                  if (err) { setUploadError(err); return }
+                  setUploadError(null)
+                  const ext = VALID_IMAGE_MIMES[file.type]
                   const path = `${profile.user_id}/avatar.${ext}`
                   const { data, error } = await supabase.storage
                     .from('avatars')
@@ -264,6 +331,7 @@ export default function DashboardClient({ initialProfile }: Props) {
                 <input
                   value={profile.display_name}
                   onChange={(e) => setProfile((p) => ({ ...p, display_name: e.target.value }))}
+                  maxLength={MAX_LENGTHS.display_name}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent transition"
                 />
               </div>
@@ -274,6 +342,7 @@ export default function DashboardClient({ initialProfile }: Props) {
                   <input
                     value={profile.username}
                     onChange={(e) => setProfile((p) => ({ ...p, username: e.target.value }))}
+                    maxLength={MAX_LENGTHS.username}
                     className="w-full pl-7 pr-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent transition"
                   />
                 </div>
@@ -287,6 +356,7 @@ export default function DashboardClient({ initialProfile }: Props) {
                 value={profile.bio}
                 onChange={(e) => setProfile((p) => ({ ...p, bio: e.target.value }))}
                 rows={2}
+                maxLength={MAX_LENGTHS.bio}
                 placeholder="간단한 소개를 적어보세요"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent transition resize-none"
               />
@@ -300,6 +370,7 @@ export default function DashboardClient({ initialProfile }: Props) {
                   type="email"
                   value={profile.email ?? ''}
                   onChange={(e) => setProfile((p) => ({ ...p, email: e.target.value }))}
+                  maxLength={MAX_LENGTHS.email}
                   placeholder="jisoo@example.com"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent transition"
                 />
@@ -310,6 +381,7 @@ export default function DashboardClient({ initialProfile }: Props) {
                   type="tel"
                   value={profile.phone ?? ''}
                   onChange={(e) => setProfile((p) => ({ ...p, phone: e.target.value }))}
+                  maxLength={MAX_LENGTHS.phone}
                   placeholder="+82-10-0000-0000"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent transition"
                 />
@@ -438,6 +510,9 @@ export default function DashboardClient({ initialProfile }: Props) {
                   onChange={(e) => {
                     const file = e.target.files?.[0]
                     if (!file) return
+                    const err = validateImageFile(file)
+                    if (err) { setUploadError(err); return }
+                    setUploadError(null)
                     setNewLink((v) => ({
                       ...v,
                       iconFile: file,
@@ -446,12 +521,19 @@ export default function DashboardClient({ initialProfile }: Props) {
                   }}
                 />
 
+                {/* 에러 메시지 */}
+                {(linkError || uploadError) && (
+                  <p className="px-4 pb-2 text-xs text-red-500">{linkError ?? uploadError}</p>
+                )}
+
                 {/* 버튼 */}
                 <div className="flex border-t border-neutral-100">
                   <button
                     onClick={() => {
                       setAddingLink(false)
                       setNewLink({ title: '', url: '', iconFile: null, iconPreview: '' })
+                      setLinkError(null)
+                      setUploadError(null)
                     }}
                     className="flex-1 py-3 text-sm text-neutral-400 hover:text-neutral-600 hover:bg-neutral-50 transition-colors"
                   >
@@ -490,6 +572,7 @@ export default function DashboardClient({ initialProfile }: Props) {
                 <input
                   value={profile.bank_name ?? ''}
                   onChange={(e) => setProfile((p) => ({ ...p, bank_name: e.target.value }))}
+                  maxLength={MAX_LENGTHS.bank_name}
                   placeholder="카카오뱅크"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent transition"
                 />
@@ -499,6 +582,7 @@ export default function DashboardClient({ initialProfile }: Props) {
                 <input
                   value={profile.account_holder ?? ''}
                   onChange={(e) => setProfile((p) => ({ ...p, account_holder: e.target.value }))}
+                  maxLength={MAX_LENGTHS.account_holder}
                   placeholder="홍길동"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent transition"
                 />
@@ -510,6 +594,7 @@ export default function DashboardClient({ initialProfile }: Props) {
               <input
                 value={profile.account_number ?? ''}
                 onChange={(e) => setProfile((p) => ({ ...p, account_number: e.target.value }))}
+                maxLength={MAX_LENGTHS.account_number}
                 placeholder="0000-00-0000000"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 font-mono placeholder:text-neutral-300 placeholder:font-sans focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent transition"
               />
@@ -521,6 +606,7 @@ export default function DashboardClient({ initialProfile }: Props) {
                 <input
                   value={profile.kakao_pay_url ?? ''}
                   onChange={(e) => setProfile((p) => ({ ...p, kakao_pay_url: e.target.value }))}
+                  maxLength={MAX_LENGTHS.kakao_pay_url}
                   placeholder="https://qr.kakaopay.com/..."
                   className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent transition"
                 />
@@ -530,6 +616,7 @@ export default function DashboardClient({ initialProfile }: Props) {
                 <input
                   value={profile.toss_url ?? ''}
                   onChange={(e) => setProfile((p) => ({ ...p, toss_url: e.target.value }))}
+                  maxLength={MAX_LENGTHS.toss_url}
                   placeholder="https://toss.me/..."
                   className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent transition"
                 />
