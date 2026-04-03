@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /Users/avoler/Desktop/Private/Jung/minimallink/src/app/[username])",
+      "Bash(npm run:*)",
+      "Bash(cat -n /Users/avoler/Desktop/Private/Jung/minimallink/src/app/[username]/page.tsx)",
+      "Bash(grep -n \"minimallink\\\\|MinimalLink\" /Users/avoler/Desktop/Private/Jung/minimallink/src/app/auth/page.tsx /Users/avoler/Desktop/Private/Jung/minimallink/src/app/page.tsx /Users/avoler/Desktop/Private/Jung/minimallink/src/app/[username]/pay/PayClient.tsx)"
+    ]
+  }
+}
