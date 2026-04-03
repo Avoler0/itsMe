@@ -112,7 +112,7 @@ export default function AuthPage() {
                     onChange={handleChange}
                     placeholder="jisoo"
                     required={mode === 'signup'}
-                    className="w-full pl-[7.5rem] pr-4 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent transition"
+                    className="w-full pl-[5.15rem] pr-4 py-2.5 rounded-xl border border-neutral-200 text-sm text-neutral-900 placeholder:text-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent transition"
                   />
                 </div>
               </div>
