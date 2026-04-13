@@ -9,6 +9,8 @@ import LinkIcon from '@/components/LinkIcon'
 import { createClient } from '@/lib/supabase/server'
 import { getProfileByUsername } from '@/lib/repositories/profiles'
 import { getTheme, resolveTextColorHex, isDarkColor, buildThemeClasses } from '@/lib/themes'
+import { headers } from 'next/headers'
+import { logPageView } from '@/lib/repositories/page_views'
 
 // ─── 데이터 페칭 (generateMetadata + Page가 각각 호출해도 쿼리는 1번) ──
 const fetchProfile = cache(async (username: string) => {
@@ -40,6 +42,15 @@ export default async function ProfilePage({
   const { username } = await params
   const profile = await fetchProfile(username)
   if (!profile) notFound()
+
+  const headersList = await headers()
+  const supabase = await createClient()
+  await logPageView(
+    supabase,
+    `/${username}`,
+    headersList.get('referer') ?? undefined,
+    headersList.get('user-agent') ?? undefined,
+  )
 
   const theme = getTheme(profile.theme)
   const textHex = resolveTextColorHex(profile.text_color)

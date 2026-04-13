@@ -171,6 +171,28 @@ CREATE POLICY "link_icons_delete_own"
     bucket_id = 'link-icons' AND auth.uid()::text = (storage.foldername(name))[1]
   );
 
+-- 9. 방문자 로그 테이블
+CREATE TABLE IF NOT EXISTS page_views (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  path        text NOT NULL,
+  referrer    text,
+  user_agent  text,
+  visited_at  timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE page_views ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "page_views_insert_all" ON page_views;
+DROP POLICY IF EXISTS "page_views_select_all" ON page_views;
+
+-- 비로그인 방문자도 삽입 가능
+CREATE POLICY "page_views_insert_all"
+  ON page_views FOR INSERT WITH CHECK (true);
+
+-- 조회는 로그인 유저만
+CREATE POLICY "page_views_select_auth"
+  ON page_views FOR SELECT USING (auth.role() = 'authenticated');
+
 -- 8. 기존 테이블에 신규 컬럼 추가 (이미 존재하면 무시)
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS show_bio       boolean NOT NULL DEFAULT true;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS show_email     boolean NOT NULL DEFAULT true;

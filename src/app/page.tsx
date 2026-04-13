@@ -1,7 +1,18 @@
 import Link from 'next/link'
 import { Zap, Link2, Palette } from 'lucide-react'
+import { headers } from 'next/headers'
+import { createClient } from '@/lib/supabase/server'
+import { logPageView } from '@/lib/repositories/page_views'
 
-export default function Home() {
+export default async function Home() {
+  const headersList = await headers()
+  const supabase = await createClient()
+  await logPageView(
+    supabase,
+    '/',
+    headersList.get('referer') ?? undefined,
+    headersList.get('user-agent') ?? undefined,
+  )
   return (
     <main className="min-h-screen bg-white font-sans">
 
